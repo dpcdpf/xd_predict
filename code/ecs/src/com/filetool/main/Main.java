@@ -10,7 +10,7 @@ import com.filetool.util.LogUtil;
  * 
  * @version [版本号, 2017-12-8]
  * @see [相关类/方法]
- * @since [产品/模块版本]
+ * @since [产品/模块版本]E:\download\练习数据\初赛文档\用例示例
  */
 public class Main {
 	public static void main(String[] args) {
@@ -30,7 +30,7 @@ public class Main {
 		// 读取输入文件
 		String[] ecsContent = FileUtil.read(ecsDataPath, null);
 		String[] inputContent = FileUtil.read(inputFilePath, null);
-
+   
 		// 功能实现入口
 		String[] resultContents = Predict.predictVm(ecsContent, inputContent);
 
