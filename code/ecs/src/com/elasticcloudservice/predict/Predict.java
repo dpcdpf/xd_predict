@@ -78,8 +78,11 @@ public class Predict {
 			StringBuffer macfla=new StringBuffer();
 			macfla.append(machineEntry.getKey()+" ");
 			Map<String,Integer> dividfla=machineEntry.getValue();
-			for(Map.Entry<String, Integer> flaEntry:dividfla.entrySet()) {
-				macfla.append(flaEntry.getKey()+" "+flaEntry.getValue()+" ");
+			for(Map.Entry<String, List<Integer>> entry:preditFla.entrySet()) {
+				Integer number=dividfla.get(entry.getKey());
+				if(number!=null) {
+					macfla.append(entry.getKey()+" "+number+" ");
+				}
 			}
 			String line=String.valueOf(macfla);
 			history.add(line);
@@ -90,6 +93,16 @@ public class Predict {
 
 		return results;
 	}
+	/*
+	 * 将预测出的虚拟机分配到机器 根据优化目标的不同 两种分法
+	 * @param predict 预测的虚拟机类型及数量 key:虚拟机名称 value:虚拟机数量
+	 * @param sortPreditFlaList 根据优化目标大小降序排列的虚拟机类型数据 key:虚拟机名称 value:虚拟机cpu数 内存数
+	 * @param nPridictFlavor 需要预测的虚拟机种类数
+	 * @param optimize 优化目标 CPU/MEM
+	 * @param machineCPU 物理机 CPU核数
+	 * @param machineMemory 物理机内存数 MB
+	 * @return machineDividFla 虚拟机到物理机的分配结果 key:物理机编号 value:对应编号下分配的虚拟机类型及数量
+	 */
 	private static Map<Integer,Map<String,Integer>> dividMachine(Map<String, Integer> predict,
 			List<Entry<String, List<Integer>>> sortPreditFlaList, int nPridictFlavor,String optimize,int machineCPU,int machineMemory ) {
 		// TODO Auto-generated method stub
@@ -97,22 +110,34 @@ public class Predict {
 		Map<Integer,List<Integer>>machineCpuMemory=new TreeMap<>();
 		int numMachine=1;//物理机编号及计数
 		if(optimize.equals("CPU")) {
-			//考虑优化CPU
+			//考虑优化CPU CPU填充要最大 内存不能超
 			machineDividFla=dividedBasedCpu(predict,sortPreditFlaList,nPridictFlavor,optimize, machineCPU,machineMemory);
 		}
-		if(optimize.equals("MEM")) {
-			//考虑优化CPU
+		else {
+			//考虑优化MEM内存 内存填充要最大 cpu数不能超
 			machineDividFla=dividedBasedMemory(predict,sortPreditFlaList,nPridictFlavor,optimize, machineCPU,machineMemory);
 		}
 		return machineDividFla;
 	}
+	/*
+	 * 将预测的虚拟机根据虚拟机的优化目标进行降序排列，先分配优化目标大的虚拟机到物理机再依次分配小的
+	 * 如果当前需要分配的虚拟机不能分配到物理机，则新建一个物理机放置
+	 * 如果物理机数量多于一个 则遍历物理机找到能装填当前虚拟机的物理机集(即物理机装填后cpu和memory不能超过物理机)
+	 * 将能装填当前虚拟机的物理机集根据装填优化目标装填率最大进行排列 第一项即是装填后装填率最大的 即成为当前虚拟机的装填物理机
+	 * @param predict 预测的虚拟机类型及数量 key:虚拟机名称 value:虚拟机数量
+	 * @param sortPreditFlaList 根据优化目标大小降序排列的虚拟机类型数据 key:虚拟机名称 value:虚拟机cpu数 内存数
+	 * @param nPridictFlavor 需要预测的虚拟机种类数
+	 * @param optimize 优化目标 CPU/MEM
+	 * @param machineCPU 物理机 CPU核数
+	 * @param machineMemory 物理机内存数 MB
+	 * @return machineDividFla 虚拟机到物理机的分配结果 key:物理机编号 value:对应编号下分配的虚拟机类型及数量
+	 */
 	private static Map<Integer, Map<String, Integer>> dividedBasedMemory(Map<String, Integer> predict,
 			List<Entry<String, List<Integer>>> sortPreditFlaList, int nPridictFlavor, String optimize, int machineCPU,
 			int machineMemory) {
 		// TODO Auto-generated method stub
 		Map<Integer,Map<String,Integer>>machineDividFla=new TreeMap<>();
 		Map<Integer,List<Integer>>machineCpuMemory=new TreeMap<>();
-		int numMachine=1;//物理机编号及计数
 		for(int i=0;i<nPridictFlavor;i++) {
 			String flaName=sortPreditFlaList.get(i).getKey();
 			int singlecpu=sortPreditFlaList.get(i).getValue().get(0);//优化目标 虚拟机的值   一般性CPU
@@ -150,7 +175,7 @@ public class Predict {
 					    }
 				}
 					//如果物理机个数大于1 遍历找到能装 将填充率最大的
-				if(machineDividFla.size()>1) {
+				else if(machineDividFla.size()>1) {
 						//1 找到可用的  2有可用的 根据填充率排序填充 找不到可用的 新建一个物理机
 					   List<Integer> capableMacNum=new ArrayList<>();
 					   //找到可用的
@@ -158,6 +183,7 @@ public class Predict {
 						   if(((entry.getValue().get(0)+singlecpu)<=machineCPU)&&((entry.getValue().get(1)+singlememo)<=machineMemory)) {
 							   capableMacNum.add(entry.getKey());
 						   }
+					   }
 						   //判断有无可用的
 						   if(capableMacNum.size()==0) {
 							   //新建物理机
@@ -204,12 +230,25 @@ public class Predict {
 								machineDividFla.put(maxMachine, new TreeMap<String,Integer>(oneMachine));
 								machineCpuMemory.put(maxMachine,Arrays.asList(filledcpu+singlecpu,filledMemory+singlememo));
 						   }
-				}
+				
 	         }
 			}
 		}
 		return machineDividFla;
 	}
+	/*
+	 * 将预测的虚拟机根据虚拟机的优化目标进行降序排列，先分配优化目标大的虚拟机到物理机再依次分配小的
+	 * 如果当前需要分配的虚拟机不能分配到物理机，则新建一个物理机放置
+	 * 如果物理机数量多于一个 则遍历物理机找到能装填当前虚拟机的物理机集(即物理机装填后cpu和memory不能超过物理机)
+	 * 将能装填当前虚拟机的物理机集根据装填优化目标装填率最大进行排列 第一项即是装填后装填率最大的 即成为当前虚拟机的装填物理机
+	 * @param predict 预测的虚拟机类型及数量 key:虚拟机名称 value:虚拟机数量
+	 * @param sortPreditFlaList 根据优化目标大小降序排列的虚拟机类型数据 key:虚拟机名称 value:虚拟机cpu数 内存数
+	 * @param nPridictFlavor 需要预测的虚拟机种类数
+	 * @param optimize 优化目标 CPU/MEM
+	 * @param machineCPU 物理机 CPU核数
+	 * @param machineMemory 物理机内存数 MB
+	 * @return machineDividFla 虚拟机到物理机的分配结果 key:物理机编号 value:对应编号下分配的虚拟机类型及数量
+	 */
 	private static Map<Integer, Map<String, Integer>> dividedBasedCpu(Map<String, Integer> predict,
 			List<Entry<String, List<Integer>>> sortPreditFlaList, int nPridictFlavor, String optimize, int machineCPU,
 			int machineMemory) {
@@ -253,7 +292,7 @@ public class Predict {
 					    }
 				}
 					//如果物理机个数大于1 遍历找到能装 将填充率最大的
-				if(machineDividFla.size()>1) {
+				else if(machineDividFla.size()>1) {
 						//1 找到可用的  2有可用的 根据填充率排序填充 找不到可用的 新建一个物理机
 					   List<Integer> capableMacNum=new ArrayList<>();
 					   //找到可用的
@@ -261,6 +300,7 @@ public class Predict {
 						   if(((entry.getValue().get(0)+singlecpu)<=machineCPU)&&((entry.getValue().get(1)+singlememo)<=machineMemory)) {
 							   capableMacNum.add(entry.getKey());
 						   }
+					   }
 						   //判断有无可用的
 						   if(capableMacNum.size()==0) {
 							   //新建物理机
@@ -307,7 +347,7 @@ public class Predict {
 								machineDividFla.put(maxMachine, new TreeMap<String,Integer>(oneMachine));
 								machineCpuMemory.put(maxMachine,Arrays.asList(filledcpu+singlecpu,filledMemory+singlememo));
 						   }
-				}
+				
 	         }
 			}
 		}
@@ -315,10 +355,10 @@ public class Predict {
 	}
 	
 	/*
-	 * 将预测虚拟机按照优化目标进行排序
-	 * @param preditFla 给定的预测的虚拟机数据
+	 * 将预测的虚拟机按照优化目标进行排序 降序 即优化目标大的放在前面 
+	 * @param preditFla 给定的预测的虚拟机数据  key:虚拟机名称 value:虚拟机预测数量
 	 * @param optimize 优化目标 CPU/Memory
-	 * @return sortPreditFlaList 按优化目标排序好的预测虚拟机数据
+	 * @return sortPreditFlaList 按优化目标排序好的预测虚拟机数据 从下标往后依次优化目标减小排列
 	 */
 	private static List<Entry<String, List<Integer>>> sortPreditFlavorBasedOptimize(
 			Map<String, List<Integer>> preditFla, String optimize) {
@@ -348,10 +388,11 @@ public class Predict {
 		return sortPreditFlaList;
 	}
 	/*
-	 * 预测虚拟机数据 一元线性回归
-	 * @param sevenDatasAll以周为单位倒序统计 正序排列的虚拟机数据
-	 * @param preditFla 需要预测的虚拟机数据
-	 * @return 预测出来的指定类型的虚拟机数目
+	 * 预测虚拟机数据 一元线性回归 x:第一周 第二周 ....y：按周进行统计的虚拟机数量 
+	 * 对于将来的也是分为周为单位进行预测  假设1-2周
+	 * @param sevenDatasAll以周为单位倒序统计 正序排列的虚拟机数据  key:虚拟机名称 value:虚拟机按周进行统计的数据 根据日期从前往后
+	 * @param preditFla 题目给出的需要预测的虚拟机数据 key:虚拟机名称 value:虚拟机cpu及memory
+	 * @return predict 预测出来的指定类型的虚拟机数目  key:虚拟机名称 value:预测的虚拟机数量
 	 */
 	private static Map<String, Integer> preFutureFla(Map<String, List<Integer>> sevenDatasAll,
 			Map<String, List<Integer>> preditFla,int pridictDay) {
@@ -362,6 +403,29 @@ public class Predict {
 			List<Integer> historynumbers=sevenDatasAll.get(preflaName);
 			//求系数
 			int n=historynumbers.size();
+			Integer[] xx=new Integer[n];
+			Integer[] yy=new Integer[n];
+			for(int i=0;i<n;i++) {
+				xx[i]=i+1;
+			}
+			for(int i=0;i<n;i++) {
+				yy[i]=historynumbers.get(i);
+			}
+			LeastSquareMethod eastSquareMethod = new LeastSquareMethod(xx,yy,3);
+			int period=1;
+			int preTime=pridictDay/period;
+			//一周或两周预测
+			int preNumber =0;
+			for(int i=1;i<=preTime;i++) {
+				preNumber+=Math.round(eastSquareMethod.fit(n+i));
+				if(preNumber<0) {
+					preNumber=0;
+				}
+			}
+			/*
+			 * 线性预测先注释
+			 */
+			/*
 			double a=0;
 			double b=0;
 			int sumxiyi=0;
@@ -378,13 +442,14 @@ public class Predict {
 			a=sumyi*1.0/n-b*sumxi*1.0/n;
 			int preTime=pridictDay/7;
 			//一周或两周预测
-			int preNumber = 0;
+			int preNumber =0;
 			for(int i=1;i<=preTime;i++) {
 				preNumber+=(int)Math.round(a+b*(n+i));
 				if(preNumber<0) {
 					preNumber=0;
 				}
 			}
+			*/
 			predict.put(preflaName, preNumber);
 		}
 		return  predict;
@@ -392,8 +457,8 @@ public class Predict {
 	/*
 	 * 虚拟机按周进行排序统计 倒序统计 不足一周舍弃 正序排列
 	 * @param flavorAll 历史虚拟机数据
-	 * @param preditFla 预测虚拟机数据 
-	 * @return sevenDatasAll 按照七天为单位进行统计的数据
+	 * @param preditFla 题目需要预测的虚拟机数据  key:虚拟机名称 value:cpu及memory
+	 * @return sevenDatasAll 按照七天为单位进行统计的数据 时间从最后一天往前统计  七天的数据合成一个 最后的不足一周的数据舍弃 key:虚拟机名称 value:虚拟机统计数据list 时间从前往后
 	 * 后续完善统计时去除异常
 	 */
 	private static Map<String, List<Integer>> countBasedSevenDay(Map<String, TreeMap<String, Integer>> flavorAll,Map<String,List<Integer>> preditFla) {
@@ -402,7 +467,7 @@ public class Predict {
 		for(Map.Entry<String, TreeMap<String,Integer>> entry:flavorAll.entrySet()) {
 			flavorAllList.add(entry);
 		}
-		int period=7;
+		int period=1;//尝试一天的统计
 		//@param sevenDatas按一周为单位统计  暂时没有去除异常数据
 		Map<String,List<Integer>> sevenDatasAll=new TreeMap<>();
 		int count=0;
@@ -418,7 +483,7 @@ public class Predict {
 			}
 			sum+=number;
 			count++;
-			if(count%7==0) {
+			if(count%period==0) {
 				sevenDatas.add(0,sum);
 				sum=0;
 			}
@@ -430,9 +495,10 @@ public class Predict {
 		return sevenDatasAll;
 	}
     /*
-     *@param preditFla 预测虚拟机的详细信息  虚拟机名字 虚拟机所需核数 内存(MB)
+     * @param preditFla 预测虚拟机的详细信息  虚拟机名字 虚拟机所需核数 内存(MB)
 	 * @param pridictDay 预测的天数
 	 * @param optimize 优化目标  CPU/Memory
+	 * @return pre 题目需要预测的虚拟机数据
      */
 	private static List<Map<String, List<Integer>>> readPrictData(String[] inputContent) {
 		// TODO Auto-generated method stub
